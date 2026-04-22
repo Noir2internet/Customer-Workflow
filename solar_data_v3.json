@@ -1,0 +1,26 @@
+{
+    "admins": [
+        "harshitkumawat616@gmail.com"
+    ],
+    "team_emails": [
+        "arpitkumawat2024@gmail.com"
+    ],
+    "steps": [
+        {
+            "id": "1",
+            "name": "Registration",
+            "role": "Consumer"
+        }
+    ],
+    "customers": [
+        {
+            "name": "hk",
+            "app_id": "",
+            "mobile": "",
+            "date": "2026-04-22",
+            "status_data": {
+                "Registration": "Attention"
+            }
+        }
+    ]
+}
