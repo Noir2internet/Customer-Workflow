@@ -72,7 +72,7 @@ DB_FILE = "enterprise_final_db.json"
 def load_db():
     if not os.path.exists(DB_FILE):
         return {
-            "super_admin": {"email": "admin@yourdomain.com", "password": "masterpassword123"},
+            "super_admin": {"email": "harshitkumawat616@gmail.com", "password": "MasterSolarAdmin2026"},
             "companies": {} 
         }
     with open(DB_FILE, 'r') as f:
