@@ -1,179 +1,246 @@
 import streamlit as st
 import pandas as pd
 import json
-import datetime
-import time
 import os
+import time
+import datetime
 
-# --- PAGE CONFIG ---
-st.set_page_config(layout="wide", page_title="SolarFlow | CRM", page_icon="☀️")
+# --- SYSTEM CONFIGURATION ---
+st.set_page_config(
+    layout="wide", 
+    page_title="SolarFlow Enterprise", 
+    page_icon="☀️",
+    initial_sidebar_state="collapsed" # Better for mobile users
+)
 
-# --- ADVANCED PROFESSIONAL STYLING ---
+# --- RESPONSIVE PROFESSIONAL CSS ---
 st.markdown("""
 <style>
-    .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-    .status-card {
-        padding: 15px; border-radius: 12px; background: white;
-        text-align: center; border: 1px solid #e0e0e0; transition: transform 0.2s;
+    /* Global Fluid Typography */
+    html { font-size: 16px; }
+    @media (max-width: 600px) { html { font-size: 14px; } }
+
+    .stApp { background-color: #f8f9fa; }
+
+    /* Responsive Horizontal Stepper */
+    .workflow-row {
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto; /* Enable horizontal swipe on mobile */
+        -webkit-overflow-scrolling: touch;
+        gap: 12px;
+        padding: 15px 10px;
+        background: #ffffff;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 20px;
     }
-    @keyframes pulse-red {
-        0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+    
+    /* Step Box - Fixed width on mobile to ensure swiping feels natural */
+    .step-box {
+        min-width: 160px;
+        max-width: 200px;
+        flex: 0 0 auto;
+        padding: 12px;
+        border-radius: 6px;
+        background: #fdfdfd;
+        border: 1px solid #edf2f7;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    .blink-red { background-color: #ffe5e5; color: #d9534f; border: 2px solid #d9534f; animation: pulse-red 2s infinite; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
-    .completed-green { background-color: #e6ffed; color: #28a745; border: 2px solid #28a745; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
-    .pending-yellow { background-color: #fff9e6; color: #f0ad4e; border: 2px solid #f0ad4e; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
+
+    /* Status Badges */
+    .status-badge {
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        display: inline-block;
+        margin-bottom: 8px;
+    }
+    .pending { background: #fff9db; color: #e67700; border: 1px solid #ffe066; }
+    .completed { background: #f4fce3; color: #2b8a3e; border: 1px solid #b2f2bb; }
+    .attention { background: #fff5f5; color: #c92a2a; border: 1px solid #ffa8a8; animation: pulse-soft 2s infinite; }
+    
+    @keyframes pulse-soft {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); background: #ffe3e3; }
+        100% { transform: scale(1); }
+    }
+
+    /* Mobile-First Adjustments */
+    @media (max-width: 768px) {
+        .stTable { font-size: 12px; }
+        .stHeader { font-size: 1.2rem; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # --- DATABASE LOGIC ---
-DATABASE_FILE = "solar_data_v3.json"
+DB_FILE = "enterprise_final_db.json"
 
-def load_data():
-    if not os.path.exists(DATABASE_FILE):
+def load_db():
+    if not os.path.exists(DB_FILE):
         return {
-            "admins": ["harshitkumawat616@gmail.com"], # Change this to your email
-            "team_emails": [],
-            "steps": [{"id": "1", "name": "Registration", "role": "Consumer"}],
-            "customers": []
+            "super_admin": {"email": "harshitkumawat616@gmail.com", "password": "MasterSolarAdmin2026"},
+            "companies": {} 
         }
-    with open(DATABASE_FILE, 'r') as f:
+    with open(DB_FILE, 'r') as f:
         return json.load(f)
 
-def save_data(data):
-    with open(DATABASE_FILE, 'w') as f:
+def save_db(data):
+    with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
 if 'db' not in st.session_state:
-    st.session_state.db = load_data()
+    st.session_state.db = load_db()
+
+if 'user' not in st.session_state:
+    st.session_state.user = None
 
 # --- AUTHENTICATION ---
-if 'user_email' not in st.session_state:
-    st.session_state.user_email = None
+def login():
+    st.markdown("<h2 style='text-align: center;'>SolarFlow Portal</h2>", unsafe_allow_html=True)
+    _, col, _ = st.columns([0.1, 1, 0.1]) if st.sidebar.get("is_mobile") else st.columns([1, 1, 1])
+    with col:
+        with st.form("auth_form"):
+            u_email = st.text_input("Email")
+            u_pass = st.text_input("Password", type="password")
+            u_role = st.selectbox("Role", ["Team Member", "Company Owner", "System Director"])
+            if st.form_submit_button("Sign In", use_container_width=True):
+                # Super Admin
+                if u_role == "System Director":
+                    if u_email == st.session_state.db['super_admin']['email'] and u_pass == st.session_state.db['super_admin']['password']:
+                        st.session_state.user = {"role": "super", "email": u_email}
+                        st.rerun()
+                # Sub-Admin/Team
+                for c_id, c_data in st.session_state.db['companies'].items():
+                    if u_role == "Company Owner":
+                        if c_data['owner']['email'] == u_email and c_data['owner']['password'] == u_pass:
+                            st.session_state.user = {"role": "sub", "email": u_email, "c_id": c_id}
+                            st.rerun()
+                    else:
+                        for t_member in c_data['team']:
+                            if t_member['email'] == u_email and t_member['password'] == u_pass:
+                                st.session_state.user = {"role": "team", "email": u_email, "c_id": c_id}
+                                st.rerun()
+                st.error("Access Denied")
+
+if not st.session_state.user:
+    login()
+    st.stop()
+
+# --- APP NAVIGATION ---
+user = st.session_state.user
+role = user['role']
 
 with st.sidebar:
-    st.title("☀️ SolarFlow")
-    if not st.session_state.user_email:
-        email_in = st.text_input("Enter Email to Access")
-        if st.button("Login"):
-            if email_in in st.session_state.db['admins'] or email_in in st.session_state.db['team_emails']:
-                st.session_state.user_email = email_in
-                st.rerun()
-            else: st.error("Access Denied.")
-        st.stop()
-    else:
-        st.write(f"User: **{st.session_state.user_email}**")
-        is_admin = st.session_state.user_email in st.session_state.db['admins']
-        if st.button("Logout"):
-            st.session_state.user_email = None
-            st.rerun()
-
-tabs = st.tabs(["📊 Dashboard", "👥 Team & Workflow", "⚙️ System"])
+    st.subheader("Account")
+    st.write(f"**{user['email']}**")
+    if st.button("Sign Out", use_container_width=True):
+        st.session_state.user = None
+        st.rerun()
 
 # ==========================================
-# TAB 1: DASHBOARD (CUSTOMERS)
+# 1. SUPER ADMIN (MASTER CONTROL)
 # ==========================================
-with tabs[0]:
-    st.header("Application Registry")
+if role == "super":
+    st.header("Master System Dashboard")
+    t1, t2 = st.tabs(["Tenant Ecosystem", "Registration"])
     
-    # 1. ADD CUSTOMER
-    with st.expander("📝 Register New Application"):
-        with st.form("new_app"):
-            c1, c2, c3 = st.columns(3)
-            name = c1.text_input("Consumer Name")
-            app_id = c2.text_input("Application #")
-            mobile = c3.text_input("Mobile")
-            if st.form_submit_button("Add Record"):
-                new_cust = {"name": name, "app_id": app_id, "mobile": mobile, "date": str(datetime.date.today()),
-                            "status_data": {s['name']: "Pending" for s in st.session_state.db['steps']}}
-                st.session_state.db['customers'].append(new_cust)
-                save_data(st.session_state.db)
-                st.rerun()
+    with t1:
+        for c_id, c_data in st.session_state.db['companies'].items():
+            with st.expander(f"Company: {c_data['name']}"):
+                st.write(f"Owner Creds: {c_data['owner']['email']} / {c_data['owner']['password']}")
+                if c_data['team']:
+                    st.write("Staff Passwords:")
+                    st.dataframe(pd.DataFrame(c_data['team']), use_container_width=True)
+                if st.button("Delete Tenant", key=f"del_{c_id}", type="secondary"):
+                    del st.session_state.db['companies'][c_id]
+                    save_db(st.session_state.db); st.rerun()
 
-    # 2. EDIT/DELETE CUSTOMERS
-    if st.session_state.db['customers']:
-        st.subheader("Manage Records")
-        for idx, cust in enumerate(st.session_state.db['customers']):
-            with st.expander(f"👤 {cust['name']} | {cust['app_id']}"):
-                col1, col2, col3 = st.columns([3, 1, 1])
-                with col1:
-                    new_n = st.text_input("Edit Name", cust['name'], key=f"edit_n_{idx}")
-                    new_a = st.text_input("Edit App ID", cust['app_id'], key=f"edit_a_{idx}")
-                with col2:
-                    if st.button("💾 Update", key=f"up_c_{idx}"):
-                        cust['name'], cust['app_id'] = new_n, new_a
-                        save_data(st.session_state.db)
-                        st.success("Updated!"); time.sleep(0.5); st.rerun()
-                with col3:
-                    if st.button("🗑️ Delete", key=f"del_c_{idx}"):
-                        st.session_state.db['customers'].pop(idx)
-                        save_data(st.session_state.db)
-                        st.warning("Deleted!"); time.sleep(0.5); st.rerun()
+    with t2:
+        with st.form("new_corp"):
+            n_name = st.text_input("Business Name")
+            o_email = st.text_input("Owner Email")
+            o_pass = st.text_input("Owner Password")
+            if st.form_submit_button("Deploy Business Instance"):
+                c_id = str(int(time.time()))
+                st.session_state.db['companies'][c_id] = {
+                    "name": n_name, "owner": {"email": o_email, "password": o_pass},
+                    "team": [], "steps": [{"id": "1", "name": "Registration", "role": "Admin"}],
+                    "customers": []
+                }
+                save_db(st.session_state.db); st.rerun()
+
+# ==========================================
+# 2. SUB-ADMIN & TEAM (OPERATIONS)
+# ==========================================
+else:
+    c_id = user['c_id']
+    comp = st.session_state.db['companies'][c_id]
+    
+    menu = ["Ops Dashboard"]
+    if role == "sub": menu += ["Staff List", "Workflow Settings"]
+    tabs = st.tabs(menu)
+
+    # OPS DASHBOARD
+    with tabs[0]:
+        st.subheader(comp['name'])
+        if role == "sub":
+            with st.expander("New Application"):
+                with st.form("add_cust"):
+                    n = st.text_input("Customer Name")
+                    r = st.text_input("Ref Number")
+                    if st.form_submit_button("Register"):
+                        comp['customers'].append({"name": n, "id": r, "stats": {s['name']: "Pending" for s in comp['steps']}})
+                        save_db(st.session_state.db); st.rerun()
 
         st.markdown("---")
-        # 3. WORKFLOW STEPPER
-        selected_name = st.selectbox("Update Workflow for:", [c['name'] for c in st.session_state.db['customers']])
-        target_cust = next(item for item in st.session_state.db['customers'] if item["name"] == selected_name)
-        
-        cols = st.columns(len(st.session_state.db['steps']))
-        for i, step in enumerate(st.session_state.db['steps']):
-            s_name = step['name']
-            current_s = target_cust['status_data'].get(s_name, "Pending")
-            with cols[i]:
-                css = "pending-yellow" if current_s == "Pending" else "completed-green" if current_s == "Completed" else "blink-red"
-                st.markdown(f"<div class='status-card'><p style='font-size:0.7rem;'>{step['role']}</p><p class='{css}'>{current_s}</p><p><b>{s_name}</b></p></div>", unsafe_allow_html=True)
-                new_s = st.selectbox("Set", ["Pending", "Completed", "Attention"], index=["Pending", "Completed", "Attention"].index(current_s), key=f"s_{selected_name}_{i}")
-                if new_s != current_s:
-                    target_cust['status_data'][s_name] = new_s
-                    save_data(st.session_state.db); st.rerun()
+        for idx, cust in enumerate(comp['customers']):
+            st.write(f"**{cust['name']}** (Ref: {cust['id']})")
+            
+            # THE SWIPABLE HORIZONTAL STEPPER
+            st.markdown('<div class="workflow-row">', unsafe_allow_html=True)
+            cols = st.columns(len(comp['steps']))
+            for i, step in enumerate(comp['steps']):
+                s_name = step['name']
+                cur_v = cust['stats'].get(s_name, "Pending")
+                with cols[i]:
+                    st.markdown(f"""
+                    <div class="step-box">
+                        <div class="status-badge {cur_v.lower()}">{cur_v}</div>
+                        <div style="font-weight:bold; font-size:0.85rem;">{s_name}</div>
+                        <div style="font-size:0.65rem; color:#6c757d;">{step['role']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    new_v = st.selectbox("Status", ["Pending", "Completed", "Attention"], 
+                                         index=["Pending", "Completed", "Attention"].index(cur_v),
+                                         key=f"v_{idx}_{i}", label_visibility="collapsed")
+                    if new_v != cur_v:
+                        cust['stats'][s_name] = new_v
+                        save_db(st.session_state.db); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-# ==========================================
-# TAB 2: TEAM & WORKFLOW (CRUD)
-# ==========================================
-with tabs[1]:
-    if not is_admin: st.warning("Admin only."); st.stop()
-    
-    col_t, col_w = st.columns(2)
-    
-    # TEAM CRUD
-    with col_t:
-        st.subheader("👥 Team Access")
-        t_email = st.text_input("New Member Email")
-        if st.button("➕ Add Member"):
-            st.session_state.db['team_emails'].append(t_email); save_data(st.session_state.db); st.rerun()
-        
-        for i, email in enumerate(st.session_state.db['team_emails']):
-            c1, c2 = st.columns([3, 1])
-            new_mail = c1.text_input(f"Member {i+1}", email, key=f"m_{i}")
-            if c2.button("🗑️", key=f"del_m_{i}"):
-                st.session_state.db['team_emails'].pop(i); save_data(st.session_state.db); st.rerun()
-            if new_mail != email: # Auto-update on change
-                st.session_state.db['team_emails'][i] = new_mail; save_data(st.session_state.db)
+    # STAFF LIST
+    if role == "sub":
+        with tabs[1]:
+            with st.form("add_staff"):
+                sn, se, sp = st.text_input("Name"), st.text_input("Email"), st.text_input("Password")
+                if st.form_submit_button("Create Staff Account"):
+                    comp['team'].append({"name": sn, "email": se, "password": sp})
+                    save_db(st.session_state.db); st.rerun()
+            if comp['team']: st.table(pd.DataFrame(comp['team']))
 
-    # WORKFLOW CRUD
-    with col_w:
-        st.subheader("⛓️ Workflow Steps")
-        with st.form("add_step"):
-            s_id = st.text_input("Step Order (ID)")
-            s_name = st.text_input("Step Name")
-            s_role = st.selectbox("Role", ["Consumer", "Vendor", "Discom", "Admin"])
-            if st.form_submit_button("➕ Add Step"):
-                st.session_state.db['steps'].append({"id": s_id, "name": s_name, "role": s_role})
-                save_data(st.session_state.db); st.rerun()
-        
-        for i, step in enumerate(st.session_state.db['steps']):
-            with st.expander(f"Step {step['id']}: {step['name']}"):
-                u_name = st.text_input("Edit Name", step['name'], key=f"un_{i}")
-                u_role = st.selectbox("Edit Role", ["Consumer", "Vendor", "Discom", "Admin"], index=["Consumer", "Vendor", "Discom", "Admin"].index(step['role']), key=f"ur_{i}")
-                c1, c2 = st.columns(2)
-                if c1.button("💾 Save", key=f"sv_s_{i}"):
-                    step['name'], step['role'] = u_name, u_role
-                    save_data(st.session_state.db); st.rerun()
-                if c2.button("🗑️ Delete Step", key=f"dl_s_{i}"):
-                    st.session_state.db['steps'].pop(i); save_data(st.session_state.db); st.rerun()
-
-with tabs[2]:
-    if st.button("🚨 Reset System Data"):
-        if st.checkbox("Confirm Deletion"):
-            if os.path.exists(DATABASE_FILE): os.remove(DATABASE_FILE); st.rerun()
+        # WORKFLOW SETTINGS
+        with tabs[2]:
+            with st.form("add_wf"):
+                wn, wr = st.text_input("Step Name"), st.selectbox("Role", ["Admin", "Vendor", "Consumer"])
+                if st.form_submit_button("Add Step"):
+                    comp['steps'].append({"name": wn, "role": wr})
+                    for c in comp['customers']: c['stats'][wn] = "Pending"
+                    save_db(st.session_state.db); st.rerun()
+            for j, s in enumerate(comp['steps']):
+                if st.button(f"Remove Step: {s['name']}", key=f"ds_{j}"):
+                    comp['steps'].pop(j)
+                    save_db(st.session_state.db); st.rerun()
