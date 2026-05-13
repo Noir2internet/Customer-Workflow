@@ -101,34 +101,41 @@ if 'user' not in st.session_state:
 # --- AUTHENTICATION ---
 def login():
     st.markdown("<h2 style='text-align: center;'>SolarFlow Portal</h2>", unsafe_allow_html=True)
-    _, col, _ = st.columns([0.1, 1, 0.1]) if st.sidebar.get("is_mobile") else st.columns([1, 1, 1])
+    
+    # Error fix: Standard columns use karein jo mobile par automatically stack ho jate hain
+    _, col, _ = st.columns([0.5, 2, 0.5]) 
+    
     with col:
         with st.form("auth_form"):
             u_email = st.text_input("Email")
             u_pass = st.text_input("Password", type="password")
             u_role = st.selectbox("Role", ["Team Member", "Company Owner", "System Director"])
+            
+            # use_container_width=True button ko mobile screen ke hisab se stretch karega
             if st.form_submit_button("Sign In", use_container_width=True):
-                # Super Admin
+                # Super Admin logic
                 if u_role == "System Director":
                     if u_email == st.session_state.db['super_admin']['email'] and u_pass == st.session_state.db['super_admin']['password']:
                         st.session_state.user = {"role": "super", "email": u_email}
                         st.rerun()
-                # Sub-Admin/Team
+                
+                # Sub-Admin/Team logic
+                found = False
                 for c_id, c_data in st.session_state.db['companies'].items():
                     if u_role == "Company Owner":
                         if c_data['owner']['email'] == u_email and c_data['owner']['password'] == u_pass:
                             st.session_state.user = {"role": "sub", "email": u_email, "c_id": c_id}
+                            found = True
                             st.rerun()
                     else:
                         for t_member in c_data['team']:
                             if t_member['email'] == u_email and t_member['password'] == u_pass:
                                 st.session_state.user = {"role": "team", "email": u_email, "c_id": c_id}
+                                found = True
                                 st.rerun()
-                st.error("Access Denied")
-
-if not st.session_state.user:
-    login()
-    st.stop()
+                
+                if not found:
+                    st.error("Access Denied: Invalid Credentials")
 
 # --- APP NAVIGATION ---
 user = st.session_state.user
